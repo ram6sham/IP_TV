@@ -2,6 +2,7 @@ package com.example
 
 import android.Manifest
 import android.app.Activity
+import android.app.Application
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -28,11 +29,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.SportsCricket
+import androidx.compose.material.icons.filled.SportsSoccer
+import androidx.compose.material.icons.filled.SportsVolleyball
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,7 +46,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -66,17 +66,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.AddStreamDialog
 import com.example.ui.components.AdminUnlockDialog
 import com.example.ui.components.InAppNotificationBanner
+import com.example.ui.components.MandatoryPopupAdDialog
 import com.example.ui.components.RemoteConfigDialog
+import com.example.ui.components.RewardedAdDialog
+import com.example.ui.components.RotationAdDialog
 import com.example.ui.screens.BroadcastStudioScreen
-import com.example.ui.screens.ChannelsScreen
-import com.example.ui.screens.ForYouScreen
-import com.example.ui.screens.LiveTVScreen
-import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.CricketScreen
+import com.example.ui.screens.FootballScreen
+import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.MoreScreen
 import com.example.ui.theme.BroadcastCyan
 import com.example.ui.theme.LiveRed
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.ObsidianBackground
 import com.example.ui.theme.SurfaceDark
+import com.example.ui.theme.SurfaceHighlight
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.util.NotificationHelper
@@ -92,13 +96,15 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
 
-    // Keep Screen ALWAYS On while live streaming - never sleeps or dims
+    // Requirement: Keep Screen ALWAYS On while live streaming - never sleeps or dims
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-    // Initialize notification channels
-    NotificationHelper.createNotificationChannel(this)
+    try {
+      NotificationHelper.createNotificationChannel(this)
+    } catch (_: Throwable) {
+      // Safe ignore
+    }
 
-    // Handle intent extras if opened from notification
     intent?.getStringExtra("EXTRA_STREAM_ID")?.let { streamId ->
       viewModel.selectStreamById(streamId)
     }
@@ -107,18 +113,21 @@ class MainActivity : ComponentActivity() {
       MyApplicationTheme {
         val context = LocalContext.current
 
-        // Request POST_NOTIFICATIONS permission on Android 13+
         val permissionLauncher = rememberLauncherForActivityResult(
           contract = ActivityResultContracts.RequestPermission()
         ) { /* Granted or denied */ }
 
         LaunchedEffect(Unit) {
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-              != PackageManager.PERMISSION_GRANTED
-            ) {
-              permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+          try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+              if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+              ) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+              }
             }
+          } catch (_: Throwable) {
+            // Safe ignore
           }
         }
 
@@ -142,65 +151,88 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
   val activity = context as? Activity
   val configuration = LocalConfiguration.current
 
-  // Orientation & Fullscreen State
   val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
   val manualFullscreen by viewModel.isFullscreen.collectAsStateWithLifecycle()
   val effectiveFullscreen = (isLandscape || manualFullscreen)
 
-  // Stream & User States
+  // Listen to mobile rotation for Requirement 6 Rotation Ad
+  LaunchedEffect(isLandscape) {
+    viewModel.onOrientationChanged(isLandscape)
+  }
+
   val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
   val currentStream by viewModel.currentStream.collectAsStateWithLifecycle()
-  val messages by viewModel.messages.collectAsStateWithLifecycle()
-  val streams by viewModel.streams.collectAsStateWithLifecycle()
-  val filteredStreams by viewModel.filteredStreams.collectAsStateWithLifecycle()
-  val personalizedRecs by viewModel.personalizedRecommendations.collectAsStateWithLifecycle()
-  val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
-  val selectedCategory by viewModel.selectedCategoryFilter.collectAsStateWithLifecycle()
+  val activeServerUrl by viewModel.activeServerUrl.collectAsStateWithLifecycle()
+  val selectedServerName by viewModel.selectedServerName.collectAsStateWithLifecycle()
+  val liveMatches by viewModel.currentlyLiveMatches.collectAsStateWithLifecycle()
+  val footballStreams by viewModel.footballStreams.collectAsStateWithLifecycle()
+  val cricketStreams by viewModel.cricketStreams.collectAsStateWithLifecycle()
+  val otherStreams by viewModel.otherSportsStreams.collectAsStateWithLifecycle()
+  val recommendations by viewModel.personalizedRecommendations.collectAsStateWithLifecycle()
+  val allStreams by viewModel.streams.collectAsStateWithLifecycle()
   val isAdminMode by viewModel.isAdminMode.collectAsStateWithLifecycle()
   val remoteConfigUrl by viewModel.remoteConfigUrl.collectAsStateWithLifecycle()
   val remoteSyncStatus by viewModel.remoteSyncStatus.collectAsStateWithLifecycle()
 
-  // Dialog States
+  // Ad Free State & Google AdSense Config (Requirement 6)
+  val isAdFree by viewModel.isAdFree.collectAsStateWithLifecycle()
+  val remainingAdFreeTime by viewModel.remainingAdFreeTime.collectAsStateWithLifecycle()
+  val adSenseConfig by viewModel.adSenseConfig.collectAsStateWithLifecycle()
+
+  // Ad Dialog States
+  val showMandatoryPopupAd by viewModel.showMandatoryPopupAd.collectAsStateWithLifecycle()
+  val showRotationAd by viewModel.showRotationAd.collectAsStateWithLifecycle()
+  val showRewardedAdDialog by viewModel.showRewardedAdDialog.collectAsStateWithLifecycle()
+
+  // Other Dialog States
   val showAddStreamDialog by viewModel.showAddStreamDialog.collectAsStateWithLifecycle()
   val showAdminLoginDialog by viewModel.showAdminLoginDialog.collectAsStateWithLifecycle()
   val showRemoteConfigDialog by viewModel.showRemoteConfigDialog.collectAsStateWithLifecycle()
   val activeAlert by viewModel.activeAlert.collectAsStateWithLifecycle()
 
-  // Fullscreen Landscape Immersive Mode - hides system bars
   LaunchedEffect(effectiveFullscreen) {
-    val window = activity?.window
-    if (window != null) {
-      val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-      if (effectiveFullscreen) {
-        insetsController.hide(WindowInsetsCompat.Type.systemBars())
-        insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-      } else {
-        insetsController.show(WindowInsetsCompat.Type.systemBars())
+    try {
+      val window = activity?.window
+      if (window != null) {
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        if (effectiveFullscreen) {
+          insetsController.hide(WindowInsetsCompat.Type.systemBars())
+          insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+          insetsController.show(WindowInsetsCompat.Type.systemBars())
+        }
       }
+    } catch (_: Throwable) {
+      // Safe ignore
     }
   }
 
-  // Handle Back Button in Fullscreen
   BackHandler(enabled = effectiveFullscreen) {
-    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
-    viewModel.setIsFullscreen(false)
-  }
-
-  // Toggle Fullscreen / Landscape function
-  val toggleFullscreenAction = {
-    if (effectiveFullscreen) {
+    try {
       activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
       viewModel.setIsFullscreen(false)
-    } else {
-      activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-      viewModel.setIsFullscreen(true)
+    } catch (_: Throwable) {
+      // Safe ignore
+    }
+  }
+
+  val toggleFullscreenAction = {
+    try {
+      if (effectiveFullscreen) {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+        viewModel.setIsFullscreen(false)
+      } else {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        viewModel.setIsFullscreen(true)
+      }
+    } catch (_: Throwable) {
+      // Safe ignore
     }
   }
 
   Scaffold(
     containerColor = ObsidianBackground,
     topBar = {
-      // Hide TopAppBar when in true Landscape Fullscreen
       if (!effectiveFullscreen) {
         TopAppBar(
           colors = TopAppBarDefaults.topAppBarColors(
@@ -208,6 +240,7 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
             titleContentColor = TextPrimary
           ),
           title = {
+            // Tapping logo 7 times unlocks Admin Panel (Requirement 5)
             Row(
               verticalAlignment = Alignment.CenterVertically,
               modifier = Modifier.clickable { viewModel.onLogoClicked() }
@@ -218,14 +251,13 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
                 modifier = Modifier.size(32.dp)
               ) {
                 Box(contentAlignment = Alignment.Center) {
-                  Text("PP", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                  Text("IP", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp)
                 }
               }
               Spacer(modifier = Modifier.width(8.dp))
-              Text("PP TV", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
+              Text("IP TV", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
               Spacer(modifier = Modifier.width(6.dp))
 
-              // LIVE pill
               Surface(
                 shape = CircleShape,
                 color = LiveRed.copy(alpha = 0.2f)
@@ -245,7 +277,6 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
                 }
               }
 
-              // Admin Mode Pill (Only if Unlocked)
               if (isAdminMode) {
                 Spacer(modifier = Modifier.width(6.dp))
                 Surface(
@@ -264,7 +295,27 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
             }
           },
           actions = {
-            // Add Stream Link button ONLY visible if Admin Mode is unlocked!
+            // Ad-Free Pass trigger / badge (Requirement 6)
+            Surface(
+              shape = RoundedCornerShape(12.dp),
+              color = if (isAdFree) Color(0xFF10B981).copy(alpha = 0.2f) else SurfaceHighlight,
+              modifier = Modifier
+                .clickable { viewModel.openRewardedAdDialog() }
+                .padding(end = 8.dp)
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+              ) {
+                Text(
+                  text = if (isAdFree) "🛡️ Ad-Free" else "🎁 Ads Free",
+                  fontSize = 11.sp,
+                  color = if (isAdFree) Color(0xFF10B981) else BroadcastCyan,
+                  fontWeight = FontWeight.Bold
+                )
+              }
+            }
+
             if (isAdminMode) {
               IconButton(
                 onClick = { viewModel.openAddStreamDialog() },
@@ -272,7 +323,7 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
               ) {
                 Icon(
                   imageVector = Icons.Default.Add,
-                  contentDescription = "Add Stream Link",
+                  contentDescription = "Add Match Link",
                   tint = BroadcastCyan
                 )
               }
@@ -282,18 +333,18 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
       }
     },
     bottomBar = {
-      // Hide Bottom Navigation when in true Landscape Fullscreen
       if (!effectiveFullscreen) {
         NavigationBar(
           containerColor = SurfaceDark,
           contentColor = TextPrimary,
           modifier = Modifier.testTag("bottom_nav_bar")
         ) {
+          // Tab 1: Home (Requirement 1)
           NavigationBarItem(
-            selected = currentTab == MainNavTab.LIVE_TV,
-            onClick = { viewModel.setTab(MainNavTab.LIVE_TV) },
-            icon = { Icon(Icons.Default.LiveTv, contentDescription = "Live TV") },
-            label = { Text("Live TV", fontSize = 11.sp) },
+            selected = currentTab == MainNavTab.HOME,
+            onClick = { viewModel.setTab(MainNavTab.HOME) },
+            icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+            label = { Text("Home", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
               selectedIconColor = Color.Black,
               selectedTextColor = BroadcastCyan,
@@ -301,14 +352,15 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
               unselectedIconColor = TextSecondary,
               unselectedTextColor = TextSecondary
             ),
-            modifier = Modifier.testTag("nav_tab_live_tv")
+            modifier = Modifier.testTag("nav_tab_home")
           )
 
+          // Tab 2: Football (Requirement 2)
           NavigationBarItem(
-            selected = currentTab == MainNavTab.CHANNELS,
-            onClick = { viewModel.setTab(MainNavTab.CHANNELS) },
-            icon = { Icon(Icons.Default.Tv, contentDescription = "Channels") },
-            label = { Text("Channels", fontSize = 11.sp) },
+            selected = currentTab == MainNavTab.FOOTBALL,
+            onClick = { viewModel.setTab(MainNavTab.FOOTBALL) },
+            icon = { Icon(Icons.Default.SportsSoccer, contentDescription = "Football") },
+            label = { Text("Football", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
               selectedIconColor = Color.Black,
               selectedTextColor = BroadcastCyan,
@@ -316,14 +368,15 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
               unselectedIconColor = TextSecondary,
               unselectedTextColor = TextSecondary
             ),
-            modifier = Modifier.testTag("nav_tab_channels")
+            modifier = Modifier.testTag("nav_tab_football")
           )
 
+          // Tab 3: Cricket (Requirement 3)
           NavigationBarItem(
-            selected = currentTab == MainNavTab.FOR_YOU,
-            onClick = { viewModel.setTab(MainNavTab.FOR_YOU) },
-            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "For You") },
-            label = { Text("For You", fontSize = 11.sp) },
+            selected = currentTab == MainNavTab.CRICKET,
+            onClick = { viewModel.setTab(MainNavTab.CRICKET) },
+            icon = { Icon(Icons.Default.SportsCricket, contentDescription = "Cricket") },
+            label = { Text("Cricket", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
               selectedIconColor = Color.Black,
               selectedTextColor = BroadcastCyan,
@@ -331,15 +384,15 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
               unselectedIconColor = TextSecondary,
               unselectedTextColor = TextSecondary
             ),
-            modifier = Modifier.testTag("nav_tab_for_you")
+            modifier = Modifier.testTag("nav_tab_cricket")
           )
 
-          // Settings Tab (Always available for viewers and admin)
+          // Tab 4: More (Requirement 2 & 4: Volleyball, WWE & More sports)
           NavigationBarItem(
-            selected = currentTab == MainNavTab.SETTINGS,
-            onClick = { viewModel.setTab(MainNavTab.SETTINGS) },
-            icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-            label = { Text("Settings", fontSize = 11.sp) },
+            selected = currentTab == MainNavTab.MORE,
+            onClick = { viewModel.setTab(MainNavTab.MORE) },
+            icon = { Icon(Icons.Default.SportsVolleyball, contentDescription = "More") },
+            label = { Text("More", fontSize = 11.sp) },
             colors = NavigationBarItemDefaults.colors(
               selectedIconColor = Color.Black,
               selectedTextColor = BroadcastCyan,
@@ -347,16 +400,16 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
               unselectedIconColor = TextSecondary,
               unselectedTextColor = TextSecondary
             ),
-            modifier = Modifier.testTag("nav_tab_settings")
+            modifier = Modifier.testTag("nav_tab_more")
           )
 
-          // Broadcast Studio Tab (ONLY VISIBLE IF ADMIN MODE IS UNLOCKED!)
+          // Tab 5: Admin Panel (Requirement 5 - ONLY visible when 7 taps unlocked)
           if (isAdminMode) {
             NavigationBarItem(
               selected = currentTab == MainNavTab.BROADCAST,
               onClick = { viewModel.setTab(MainNavTab.BROADCAST) },
-              icon = { Icon(Icons.Default.Campaign, contentDescription = "Broadcast") },
-              label = { Text("Broadcast", fontSize = 11.sp) },
+              icon = { Icon(Icons.Default.Campaign, contentDescription = "Admin Panel") },
+              label = { Text("Admin", fontSize = 11.sp) },
               colors = NavigationBarItemDefaults.colors(
                 selectedIconColor = Color.White,
                 selectedTextColor = LiveRed,
@@ -376,74 +429,76 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
         .fillMaxSize()
         .padding(if (effectiveFullscreen) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
     ) {
-      // Main Screens Switcher
       when (currentTab) {
-        MainNavTab.LIVE_TV -> {
-          LiveTVScreen(
+        MainNavTab.HOME -> {
+          HomeScreen(
             currentStream = currentStream,
-            messages = messages,
-            reactionsFlow = viewModel.reactions,
-            recommendedStreams = personalizedRecs,
+            activeServerUrl = activeServerUrl,
+            selectedServerName = selectedServerName,
+            liveMatches = liveMatches,
+            recommendedMatches = recommendations,
+            isAdFree = isAdFree,
+            remainingAdFreeTime = remainingAdFreeTime,
+            adSenseConfig = adSenseConfig,
             isFullscreen = effectiveFullscreen,
             isAdminMode = isAdminMode,
-            onSendMessage = { text -> viewModel.sendChatMessage(text) },
-            onTriggerReaction = { emoji -> viewModel.triggerReaction(emoji) },
+            onSelectServer = { name, url -> viewModel.selectServer(name, url) },
             onLikeStream = { viewModel.likeCurrentStream() },
-            onLikeMessage = { id -> viewModel.likeChatMessage(id) },
-            onSelectRecommendedStream = { stream -> viewModel.selectStream(stream) },
+            onSelectLiveMatch = { match -> viewModel.selectStream(match) },
             onOpenAddStreamDialog = { viewModel.openAddStreamDialog() },
+            onOpenRewardedAd = { viewModel.openRewardedAdDialog() },
+            onSyncRemoteGist = { viewModel.syncRemoteStreamsNow() },
             onFullscreenToggle = toggleFullscreenAction
           )
         }
-        MainNavTab.CHANNELS -> {
-          ChannelsScreen(
-            streams = filteredStreams,
-            searchQuery = searchQuery,
-            selectedCategory = selectedCategory,
+        MainNavTab.FOOTBALL -> {
+          FootballScreen(
+            footballStreams = footballStreams,
             isAdminMode = isAdminMode,
-            onSearchQueryChange = { q -> viewModel.setSearchQuery(q) },
-            onCategorySelect = { cat -> viewModel.setCategoryFilter(cat) },
             onStreamClick = { stream -> viewModel.selectStream(stream) },
             onOpenAddStreamDialog = { viewModel.openAddStreamDialog() }
           )
         }
-        MainNavTab.FOR_YOU -> {
-          ForYouScreen(
-            recommendations = personalizedRecs,
-            allStreams = streams,
-            onSelectStream = { stream -> viewModel.selectStream(stream) }
+        MainNavTab.CRICKET -> {
+          CricketScreen(
+            cricketStreams = cricketStreams,
+            isAdminMode = isAdminMode,
+            onStreamClick = { stream -> viewModel.selectStream(stream) },
+            onOpenAddStreamDialog = { viewModel.openAddStreamDialog() }
           )
         }
-        MainNavTab.SETTINGS -> {
-          SettingsScreen(
+        MainNavTab.MORE -> {
+          MoreScreen(
+            otherStreams = otherStreams,
             isAdminMode = isAdminMode,
-            remoteConfigUrl = remoteConfigUrl,
-            remoteSyncStatus = remoteSyncStatus,
-            onOpenAdminLogin = { viewModel.openAdminLoginDialog() },
-            onLockAdmin = { viewModel.lockAdminMode() },
-            onOpenRemoteConfig = { viewModel.openRemoteConfigDialog() }
+            onStreamClick = { stream -> viewModel.selectStream(stream) },
+            onOpenAddStreamDialog = { viewModel.openAddStreamDialog() }
           )
         }
         MainNavTab.BROADCAST -> {
           if (isAdminMode) {
             BroadcastStudioScreen(
-              allStreams = streams,
-              onSaveAndBroadcast = { title, url, cat, broadcaster, desc, notify, autoPlay ->
-                viewModel.saveAndBroadcastStream(title, url, cat, broadcaster, desc, notify, autoPlay)
+              allStreams = allStreams,
+              adSenseConfig = adSenseConfig,
+              onSaveAndBroadcast = { title, url, sport, status, broadcaster, desc, score, s1, s2, s3, notify, autoPlay ->
+                viewModel.saveAndBroadcastStream(title, url, sport, status, broadcaster, desc, score, s1, s2, s3, notify, autoPlay)
               },
               onSelectStream = { stream -> viewModel.selectStream(stream) },
+              onSaveAdSenseConfig = { pub, banner, inter, rew, rot, authDom, popE, rotE, banE ->
+                viewModel.saveAdSenseConfig(pub, banner, inter, rew, rot, authDom, popE, rotE, banE)
+              },
+              onDeleteStream = { streamId -> viewModel.deleteStream(streamId) },
+              onUpdateStream = { stream -> viewModel.updateStream(stream) },
               onOpenRemoteConfig = { viewModel.openRemoteConfigDialog() }
             )
           } else {
-            // Auto redirect to Live TV if locked
             LaunchedEffect(Unit) {
-              viewModel.setTab(MainNavTab.LIVE_TV)
+              viewModel.setTab(MainNavTab.HOME)
             }
           }
         }
       }
 
-      // In-App Notification Alert Overlay Banner (Only when not in fullscreen)
       if (!effectiveFullscreen) {
         InAppNotificationBanner(
           alert = activeAlert,
@@ -456,25 +511,56 @@ fun PPTVAppContent(viewModel: PPTVViewModel) {
         )
       }
 
-      // Add Stream Link Modal Dialog (Only in Admin Mode)
       if (showAddStreamDialog && isAdminMode) {
         AddStreamDialog(
           onDismiss = { viewModel.closeAddStreamDialog() },
-          onSaveAndBroadcast = { title, url, cat, broadcaster, desc, notify, autoPlay ->
-            viewModel.saveAndBroadcastStream(title, url, cat, broadcaster, desc, notify, autoPlay)
+          onSaveAndBroadcast = { title, url, sport, status, broadcaster, desc, score, s1, s2, s3, notify, autoPlay ->
+            viewModel.saveAndBroadcastStream(title, url, sport, status, broadcaster, desc, score, s1, s2, s3, notify, autoPlay)
           }
         )
       }
 
-      // Admin PIN Verification Dialog
+      // Requirement 5: Admin Login Dialog (Triggered by 7 taps on logo)
       if (showAdminLoginDialog) {
         AdminUnlockDialog(
           onDismiss = { viewModel.closeAdminLoginDialog() },
-          onVerifyPin = { pin -> viewModel.verifyAdminPin(pin) }
+          onVerifyPin = { pass -> viewModel.verifyAdminPassword(pass) }
         )
       }
 
-      // Remote Config Auto-Update Dialog
+      // Requirement 6: Mandatory 15s Startup Popup Ad
+      if (showMandatoryPopupAd) {
+        MandatoryPopupAdDialog(
+          publisherId = adSenseConfig.publisherId,
+          adUnitId = adSenseConfig.interstitialAdUnitId,
+          authorizedDomain = adSenseConfig.authorizedDomain,
+          onDismiss = { viewModel.closeMandatoryPopupAd() },
+          onRewardEarned = { viewModel.grant12HourAdFreePass() }
+        )
+      }
+
+      // Requirement 6: Mobile Rotation Interstitial Ad
+      if (showRotationAd) {
+        RotationAdDialog(
+          adUnitId = adSenseConfig.rotationAdUnitId,
+          publisherId = adSenseConfig.publisherId,
+          authorizedDomain = adSenseConfig.authorizedDomain,
+          onDismiss = { viewModel.closeRotationAd() }
+        )
+      }
+
+      // Requirement 6: Rewarded 20s Ad for 12 Hours Ad-Free
+      if (showRewardedAdDialog) {
+        RewardedAdDialog(
+          publisherId = adSenseConfig.publisherId,
+          adUnitId = adSenseConfig.rewardedAdUnitId,
+          authorizedDomain = adSenseConfig.authorizedDomain,
+          onDismiss = { viewModel.closeRewardedAdDialog() },
+          onRewardEarned = { viewModel.grant12HourAdFreePass() }
+        )
+      }
+
+      // Requirement 1 & 7: Remote GitHub Gist Config Dialog
       if (showRemoteConfigDialog) {
         RemoteConfigDialog(
           currentUrl = remoteConfigUrl,

@@ -107,7 +107,7 @@ fun RemoteConfigDialog(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Nepali Explanation
+        // English Explanation
         Surface(
           shape = RoundedCornerShape(10.dp),
           color = SurfaceVariantDark,
@@ -115,13 +115,13 @@ fun RemoteConfigDialog(
         ) {
           Column(modifier = Modifier.padding(12.dp)) {
             Text(
-              text = "💡 Link Auto-Update कसरी काम गर्छ?",
+              text = "💡 How Does Link Auto-Update Work?",
               fontWeight = FontWeight.Bold,
               fontSize = 13.sp,
               color = BroadcastCyan
             )
             Text(
-              text = "कुनै पनि निःशुल्क सर्भर (जस्तै GitHub Gist, Raw JSON, वा Firebase) मा एउटा JSON फाइल बनाउनुहोस्। एपले प्रत्येक ६० सेकेन्डमा स्वतः नयाँ लिङ्क चेक गर्छ। तपाईँले अनलाइन लिङ्क फेर्ने बित्तिकै संसारभरका सबै मोबाइलमा स्वतः नयाँ स्ट्रिम चल्नेछ!",
+              text = "Host your master JSON file on GitHub Gist, Raw GitHub, or any remote server. The app automatically checks and updates stream links every 60 seconds in the background. When you change links online, all viewers worldwide receive the updated streams in real-time!",
               fontSize = 11.sp,
               color = TextSecondary,
               lineHeight = 16.sp,
@@ -165,7 +165,7 @@ fun RemoteConfigDialog(
         // Sample JSON format preview
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-          text = "JSON Structure Example (अनलाइन राख्ने ढाँचा):",
+          text = "JSON Structure Example (Remote Schema):",
           fontSize = 11.sp,
           fontWeight = FontWeight.SemiBold,
           color = TextSecondary
@@ -180,11 +180,11 @@ fun RemoteConfigDialog(
           Text(
             text = """[
   {
-    "id": "stream_pptv_official",
-    "title": "PP TV 24/7 Live Stream HD",
+    "id": "stream_iptv_official",
+    "title": "IP TV 24/7 Live Stream HD",
     "streamUrl": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-    "category": "NEWS",
-    "broadcasterName": "PP TV Studios"
+    "category": "CRICKET",
+    "broadcasterName": "IP TV Studios"
   }
 ]""",
             fontFamily = FontFamily.Monospace,

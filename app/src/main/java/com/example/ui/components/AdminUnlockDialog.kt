@@ -54,7 +54,7 @@ fun AdminUnlockDialog(
   onDismiss: () -> Unit,
   onVerifyPin: (String) -> Boolean
 ) {
-  var pinInput by remember { mutableStateOf("") }
+  var passwordInput by remember { mutableStateOf("") }
   var errorMessage by remember { mutableStateOf<String?>(null) }
 
   Dialog(onDismissRequest = onDismiss) {
@@ -81,7 +81,7 @@ fun AdminUnlockDialog(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-              text = "Broadcaster / Admin Access",
+              text = "Admin Panel Access",
               fontWeight = FontWeight.Bold,
               fontSize = 17.sp,
               color = TextPrimary
@@ -96,7 +96,7 @@ fun AdminUnlockDialog(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-          text = "साधारण दर्शकहरूका लागि लिंक थप्ने वा ब्रोडकास्ट गर्ने सुविधा बन्द गरिएको छ। केवल एडमिनले मात्र पिन राखेर खोल्न सक्नुहुन्छ।",
+          text = "Admin Panel is unlocked after tapping the app logo 7 times. Enter the administrator password to manage match broadcasts and AdSense configuration.",
           fontSize = 12.sp,
           color = TextSecondary,
           lineHeight = 16.sp
@@ -105,7 +105,7 @@ fun AdminUnlockDialog(
         Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-          text = "Enter Admin PIN (Default: 1234)",
+          text = "Enter Admin Password",
           fontSize = 12.sp,
           fontWeight = FontWeight.SemiBold,
           color = BroadcastCyan
@@ -113,26 +113,26 @@ fun AdminUnlockDialog(
         Spacer(modifier = Modifier.height(4.dp))
 
         OutlinedTextField(
-          value = pinInput,
+          value = passwordInput,
           onValueChange = {
-            pinInput = it
+            passwordInput = it
             errorMessage = null
           },
-          placeholder = { Text("Enter 4-digit PIN", color = TextMuted) },
+          placeholder = { Text("Password (PPTV134679)", color = TextMuted) },
           leadingIcon = {
             Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = BroadcastCyan)
           },
           singleLine = true,
           keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.NumberPassword,
+            keyboardType = KeyboardType.Password,
             imeAction = ImeAction.Done
           ),
           keyboardActions = KeyboardActions(
             onDone = {
-              if (onVerifyPin(pinInput)) {
+              if (onVerifyPin(passwordInput)) {
                 onDismiss()
               } else {
-                errorMessage = "Incorrect PIN code. Please try again."
+                errorMessage = "Incorrect password! Please enter the valid admin password."
               }
             }
           ),
@@ -173,17 +173,17 @@ fun AdminUnlockDialog(
           Spacer(modifier = Modifier.width(8.dp))
           Button(
             onClick = {
-              if (onVerifyPin(pinInput)) {
+              if (onVerifyPin(passwordInput)) {
                 onDismiss()
               } else {
-                errorMessage = "Incorrect PIN code. Default is 1234."
+                errorMessage = "Incorrect password! Please enter the valid admin password."
               }
             },
             colors = ButtonDefaults.buttonColors(containerColor = LiveRed),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier.testTag("submit_admin_pin_button")
           ) {
-            Text("Unlock Studio 🔓", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Unlock Panel 🔓", color = Color.White, fontWeight = FontWeight.Bold)
           }
         }
       }

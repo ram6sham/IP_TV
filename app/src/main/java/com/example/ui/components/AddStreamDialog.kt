@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,9 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Sports
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -48,7 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.model.StreamCategory
+import com.example.model.MatchStatus
+import com.example.model.SportCategory
 import com.example.ui.theme.BroadcastCyan
 import com.example.ui.theme.LiveRed
 import com.example.ui.theme.SurfaceDark
@@ -58,6 +56,9 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
+/**
+ * Requirement 3: Add Match with Server 1, Server 2, and Server 3 options.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddStreamDialog(
@@ -65,29 +66,35 @@ fun AddStreamDialog(
   onSaveAndBroadcast: (
     title: String,
     streamUrl: String,
-    category: StreamCategory,
+    sportCategory: SportCategory,
+    matchStatus: MatchStatus,
     broadcasterName: String,
     description: String,
+    score: String,
+    server1Url: String,
+    server2Url: String,
+    server3Url: String,
     notifyInstantly: Boolean,
     autoPlayNow: Boolean
   ) -> Unit
 ) {
   var streamTitle by remember { mutableStateOf("") }
-  var streamUrl by remember { mutableStateOf("") }
-  var broadcasterName by remember { mutableStateOf("PP TV Live") }
+  var server1Url by remember { mutableStateOf("") }
+  var server2Url by remember { mutableStateOf("") }
+  var server3Url by remember { mutableStateOf("") }
+  var broadcasterName by remember { mutableStateOf("IP TV Sports") }
   var description by remember { mutableStateOf("") }
-  var selectedCategory by remember { mutableStateOf(StreamCategory.NEWS) }
+  var score by remember { mutableStateOf("") }
+  var selectedCategory by remember { mutableStateOf(SportCategory.CRICKET) }
+  var selectedStatus by remember { mutableStateOf(MatchStatus.LIVE) }
   var notifyInstantly by remember { mutableStateOf(true) }
   var autoPlayNow by remember { mutableStateOf(true) }
 
   var errorMessage by remember { mutableStateOf<String?>(null) }
 
-  // Quick Preset Samples for immediate testing
   val presetLinks = listOf(
-    "Mux HLS Live" to "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-    "Big Buck HD" to "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    "Tears of Steel" to "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-    "Blender Sintel" to "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+    "Mux HLS 1080p" to "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    "Bunny Live Arena" to "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
   )
 
   Dialog(
@@ -116,15 +123,15 @@ fun AddStreamDialog(
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
               imageVector = Icons.Default.Campaign,
-              contentDescription = "Broadcast",
+              contentDescription = "Admin Broadcast",
               tint = LiveRed,
               modifier = Modifier.size(26.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-              text = "Broadcast Live Stream",
+              text = "Add Match & Multi-Servers",
               fontWeight = FontWeight.Bold,
-              fontSize = 18.sp,
+              fontSize = 17.sp,
               color = TextPrimary
             )
           }
@@ -138,34 +145,32 @@ fun AddStreamDialog(
         }
 
         Text(
-          text = "Streem Link राखेर सेभ गर्नुहोस् — तुरुन्तै सबैको मोबाइलमा अटो प्ले हुनेछ र तत्कालै नोटिफिकेसन जानेछ।",
-          fontSize = 12.sp,
+          text = "Configure Server 1, Server 2, and Server 3 streaming links. Viewers will be able to switch between servers instantly.",
+          fontSize = 11.sp,
           color = TextSecondary,
-          modifier = Modifier.padding(top = 4.dp, bottom = 14.dp)
+          modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
         )
 
-        // Stream URL Input
+        // Server 1 (Primary)
         Text(
-          text = "Stream Link / URL (HLS .m3u8 or MP4)",
+          text = "⚡ Server 1 URL (Primary Stream) *",
           fontSize = 12.sp,
-          fontWeight = FontWeight.SemiBold,
+          fontWeight = FontWeight.Bold,
           color = BroadcastCyan
         )
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
-          value = streamUrl,
+          value = server1Url,
           onValueChange = {
-            streamUrl = it
+            server1Url = it
             errorMessage = null
           },
-          placeholder = { Text("https://example.com/live/stream.m3u8", color = TextMuted, fontSize = 12.sp) },
+          placeholder = { Text("https://example.com/live/server1.m3u8", color = TextMuted, fontSize = 12.sp) },
           leadingIcon = {
-            Icon(imageVector = Icons.Default.Link, contentDescription = "Link", tint = BroadcastCyan)
+            Icon(imageVector = Icons.Default.Link, contentDescription = "Server 1", tint = BroadcastCyan)
           },
           singleLine = true,
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("stream_url_input"),
+          modifier = Modifier.fillMaxWidth().testTag("server1_url_input"),
           colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = SurfaceVariantDark,
             unfocusedContainerColor = SurfaceVariantDark,
@@ -177,56 +182,42 @@ fun AddStreamDialog(
           shape = RoundedCornerShape(12.dp)
         )
 
-        // Quick sample test links
+        // Presets helper
         Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 12.dp),
+          modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
           horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
           presetLinks.forEach { (label, url) ->
             Surface(
-              shape = RoundedCornerShape(8.dp),
+              shape = RoundedCornerShape(6.dp),
               color = SurfaceHighlight,
-              modifier = Modifier
-                .clickable {
-                  streamUrl = url
-                  if (streamTitle.isBlank()) streamTitle = "Live Stream: $label"
-                }
+              modifier = Modifier.clickable {
+                server1Url = url
+                if (streamTitle.isBlank()) streamTitle = "Live Sports: $label"
+              }
             ) {
-              Text(
-                text = label,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                color = TextSecondary,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-              )
+              Text(text = label, fontSize = 10.sp, color = TextSecondary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
             }
           }
         }
 
-        // Stream Title
+        // Server 2 (Backup / HD)
         Text(
-          text = "Stream Title / कार्यक्रमको नाम",
+          text = "🚀 Server 2 URL (Backup / HD - Optional)",
           fontSize = 12.sp,
           fontWeight = FontWeight.SemiBold,
           color = TextPrimary
         )
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
-          value = streamTitle,
-          onValueChange = {
-            streamTitle = it
-            errorMessage = null
-          },
-          placeholder = { Text("e.g. PP TV Breaking Live or Sports Match", color = TextMuted, fontSize = 12.sp) },
+          value = server2Url,
+          onValueChange = { server2Url = it },
+          placeholder = { Text("https://example.com/live/server2.m3u8 (Optional)", color = TextMuted, fontSize = 12.sp) },
           leadingIcon = {
-            Icon(imageVector = Icons.Default.Tv, contentDescription = "Title", tint = TextSecondary)
+            Icon(imageVector = Icons.Default.Link, contentDescription = "Server 2", tint = TextSecondary)
           },
           singleLine = true,
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("stream_title_input"),
+          modifier = Modifier.fillMaxWidth().testTag("server2_url_input"),
           colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = SurfaceVariantDark,
             unfocusedContainerColor = SurfaceVariantDark,
@@ -238,24 +229,25 @@ fun AddStreamDialog(
           shape = RoundedCornerShape(12.dp)
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Broadcaster Name
+        // Server 3 (Alternative / Fast)
         Text(
-          text = "Broadcaster / Channel Name",
+          text = "🛡️ Server 3 URL (Alternative / Fast - Optional)",
           fontSize = 12.sp,
           fontWeight = FontWeight.SemiBold,
           color = TextPrimary
         )
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
-          value = broadcasterName,
-          onValueChange = { broadcasterName = it },
-          placeholder = { Text("PP TV Studio / Host Name", color = TextMuted, fontSize = 12.sp) },
+          value = server3Url,
+          onValueChange = { server3Url = it },
+          placeholder = { Text("https://example.com/live/server3.m3u8 (Optional)", color = TextMuted, fontSize = 12.sp) },
+          leadingIcon = {
+            Icon(imageVector = Icons.Default.Link, contentDescription = "Server 3", tint = TextSecondary)
+          },
           singleLine = true,
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("broadcaster_name_input"),
+          modifier = Modifier.fillMaxWidth().testTag("server3_url_input"),
           colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = SurfaceVariantDark,
             unfocusedContainerColor = SurfaceVariantDark,
@@ -269,28 +261,23 @@ fun AddStreamDialog(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Category Selection
-        Text(
-          text = "Select Category",
-          fontSize = 12.sp,
-          fontWeight = FontWeight.SemiBold,
-          color = TextPrimary
-        )
+        // Sport Category Selector
+        Text("Sport Category", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
         Spacer(modifier = Modifier.height(6.dp))
         FlowRow(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(6.dp),
           verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-          StreamCategory.entries.filter { it != StreamCategory.ALL }.forEach { category ->
-            val isSelected = selectedCategory == category
+          SportCategory.entries.forEach { sport ->
+            val isSelected = selectedCategory == sport
             Surface(
               shape = RoundedCornerShape(20.dp),
               color = if (isSelected) BroadcastCyan else SurfaceVariantDark,
-              modifier = Modifier.clickable { selectedCategory = category }
+              modifier = Modifier.clickable { selectedCategory = sport }
             ) {
               Text(
-                text = category.displayName,
+                text = "${sport.icon} ${sport.displayName}",
                 color = if (isSelected) Color.Black else TextSecondary,
                 fontSize = 11.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -300,15 +287,86 @@ fun AddStreamDialog(
           }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Instant Notification Checkbox
+        // Match Status (LIVE / UPCOMING)
+        Text("Match Status", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          listOf(MatchStatus.LIVE to "🔴 LIVE NOW", MatchStatus.UPCOMING to "⏰ UPCOMING").forEach { (status, label) ->
+            val isSelected = selectedStatus == status
+            Surface(
+              shape = RoundedCornerShape(14.dp),
+              color = if (isSelected) (if (status == MatchStatus.LIVE) LiveRed else Color(0xFFF59E0B)) else SurfaceVariantDark,
+              modifier = Modifier.clickable { selectedStatus = status }
+            ) {
+              Text(
+                text = label,
+                color = if (isSelected) Color.White else TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+              )
+            }
+          }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Match Title
+        Text("Match Title *", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+          value = streamTitle,
+          onValueChange = {
+            streamTitle = it
+            errorMessage = null
+          },
+          placeholder = { Text("e.g. Nepal vs Netherlands, Real Madrid vs Barcelona", color = TextMuted, fontSize = 12.sp) },
+          leadingIcon = {
+            Icon(Icons.Default.Sports, contentDescription = null, tint = TextSecondary)
+          },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth().testTag("stream_title_input"),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = SurfaceVariantDark,
+            unfocusedContainerColor = SurfaceVariantDark,
+            focusedBorderColor = BroadcastCyan,
+            unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+          ),
+          shape = RoundedCornerShape(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Live Score (Optional)
+        Text("Live Score (Optional)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+          value = score,
+          onValueChange = { score = it },
+          placeholder = { Text("e.g. NEP 156/4 (17.2) or RMA 2 - 1 BAR (74')", color = TextMuted, fontSize = 12.sp) },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth(),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = SurfaceVariantDark,
+            unfocusedContainerColor = SurfaceVariantDark,
+            focusedBorderColor = BroadcastCyan,
+            unfocusedBorderColor = Color.Transparent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+          ),
+          shape = RoundedCornerShape(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Notification Checkbox
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier
-            .fillMaxWidth()
-            .clickable { notifyInstantly = !notifyInstantly }
-            .padding(vertical = 4.dp)
+          modifier = Modifier.fillMaxWidth().clickable { notifyInstantly = !notifyInstantly }.padding(vertical = 2.dp)
         ) {
           Checkbox(
             checked = notifyInstantly,
@@ -316,37 +374,13 @@ fun AddStreamDialog(
             colors = CheckboxDefaults.colors(checkedColor = LiveRed)
           )
           Spacer(modifier = Modifier.width(4.dp))
-          Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Icon(
-                imageVector = Icons.Default.NotificationsActive,
-                contentDescription = "Alert",
-                tint = LiveRed,
-                modifier = Modifier.size(16.dp)
-              )
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "Instant Push Notification to Users",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                color = TextPrimary
-              )
-            }
-            Text(
-              text = "तत्कालै सबै प्रयोगकर्ताहरूलाई अलर्ट सूचना पठाउनुहोस्",
-              fontSize = 10.sp,
-              color = TextSecondary
-            )
-          }
+          Text(text = "Send instant notification to all viewers", fontSize = 11.sp, color = TextPrimary)
         }
 
         // Auto-play Checkbox
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier
-            .fillMaxWidth()
-            .clickable { autoPlayNow = !autoPlayNow }
-            .padding(vertical = 4.dp)
+          modifier = Modifier.fillMaxWidth().clickable { autoPlayNow = !autoPlayNow }.padding(vertical = 2.dp)
         ) {
           Checkbox(
             checked = autoPlayNow,
@@ -354,42 +388,15 @@ fun AddStreamDialog(
             colors = CheckboxDefaults.colors(checkedColor = BroadcastCyan)
           )
           Spacer(modifier = Modifier.width(4.dp))
-          Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Icon(
-                imageVector = Icons.Default.PlayCircle,
-                contentDescription = "Auto-play",
-                tint = BroadcastCyan,
-                modifier = Modifier.size(16.dp)
-              )
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(
-                text = "Auto-Play on Everyone's App",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                color = TextPrimary
-              )
-            }
-            Text(
-              text = "सेभ गर्ने बित्तिकै तुरुन्तै स्क्रिनमा लाइभ प्ले गर्नुहोस्",
-              fontSize = 10.sp,
-              color = TextSecondary
-            )
-          }
+          Text(text = "Auto-play on Home screen immediately after saving", fontSize = 11.sp, color = TextPrimary)
         }
 
         if (errorMessage != null) {
-          Text(
-            text = errorMessage ?: "",
-            color = LiveRed,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 8.dp)
-          )
+          Text(text = errorMessage ?: "", color = LiveRed, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Action Buttons
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.End,
@@ -398,25 +405,28 @@ fun AddStreamDialog(
           TextButton(onClick = onDismiss) {
             Text("Cancel", color = TextSecondary)
           }
-
           Spacer(modifier = Modifier.width(8.dp))
-
           Button(
             onClick = {
-              if (streamUrl.isBlank()) {
-                errorMessage = "Please enter a valid Stream Link (URL)"
+              if (server1Url.isBlank()) {
+                errorMessage = "Please enter Server 1 URL"
                 return@Button
               }
               if (streamTitle.isBlank()) {
-                errorMessage = "Please enter a stream title"
+                errorMessage = "Please enter a match title"
                 return@Button
               }
               onSaveAndBroadcast(
                 streamTitle,
-                streamUrl,
+                server1Url,
                 selectedCategory,
+                selectedStatus,
                 broadcasterName,
                 description,
+                score,
+                server1Url,
+                server2Url,
+                server3Url,
                 notifyInstantly,
                 autoPlayNow
               )
@@ -425,18 +435,7 @@ fun AddStreamDialog(
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.testTag("save_and_broadcast_button")
           ) {
-            Icon(
-              imageVector = Icons.Default.Campaign,
-              contentDescription = "Save & Broadcast",
-              tint = Color.White,
-              modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = "Save & Broadcast 🚀",
-              color = Color.White,
-              fontWeight = FontWeight.Bold
-            )
+            Text("Save & Broadcast 🚀", color = Color.White, fontWeight = FontWeight.Bold)
           }
         }
       }

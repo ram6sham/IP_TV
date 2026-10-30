@@ -17,7 +17,7 @@ import com.example.model.LiveStream
 
 object NotificationHelper {
   private const val CHANNEL_ID = "pptv_live_broadcasts"
-  private const val CHANNEL_NAME = "PP TV Live Broadcasts & Alerts"
+  private const val CHANNEL_NAME = "IP TV Live Broadcasts & Alerts"
   private const val CHANNEL_DESC = "Notifications for newly added live streams and breaking broadcasts"
 
   fun createNotificationChannel(context: Context) {
@@ -59,11 +59,11 @@ object NotificationHelper {
 
     val notification = NotificationCompat.Builder(context, CHANNEL_ID)
       .setSmallIcon(R.mipmap.ic_launcher)
-      .setContentTitle("🔴 LIVE NOW on PP TV: ${stream.title}")
+      .setContentTitle("🔴 LIVE NOW on IP TV: ${stream.title}")
       .setContentText("${stream.broadcasterName} is broadcasting live! Tap to watch instantly.")
       .setStyle(
         NotificationCompat.BigTextStyle()
-          .bigText("${stream.broadcasterName} just published a new live broadcast: \"${stream.title}\". Stream Link is active and broadcasting live now on PP TV!")
+          .bigText("${stream.broadcasterName} just published a new live broadcast: \"${stream.title}\". Stream Link is active and broadcasting live now on IP TV!")
       )
       .setPriority(NotificationCompat.PRIORITY_HIGH)
       .setDefaults(NotificationCompat.DEFAULT_ALL)
@@ -73,8 +73,8 @@ object NotificationHelper {
 
     try {
       NotificationManagerCompat.from(context).notify(System.currentTimeMillis().toInt(), notification)
-    } catch (_: SecurityException) {
-      // Permission not granted
+    } catch (_: Throwable) {
+      // Notification failed or permission denied
     }
   }
 }

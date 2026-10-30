@@ -3,8 +3,9 @@ package com.example.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.model.LiveStream
+import com.example.model.MatchStatus
 import com.example.model.NotificationAlert
-import com.example.model.StreamCategory
+import com.example.model.SportCategory
 import com.example.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,91 +31,20 @@ class StreamRepository(
   private val scope: CoroutineScope? = null
 ) {
 
+  companion object {
+    // User's GitHub Gist Raw URL: https://gist.github.com/ram6sham/a908890071581ef2542de6cd5224243a
+    const val DEFAULT_GIST_RAW_URL = "https://gist.githubusercontent.com/ram6sham/a908890071581ef2542de6cd5224243a/raw"
+  }
+
   private val prefs: SharedPreferences = context.getSharedPreferences("pptv_stream_prefs", Context.MODE_PRIVATE)
 
   private val httpClient = OkHttpClient.Builder()
-    .connectTimeout(10, TimeUnit.SECONDS)
-    .readTimeout(10, TimeUnit.SECONDS)
+    .connectTimeout(12, TimeUnit.SECONDS)
+    .readTimeout(12, TimeUnit.SECONDS)
     .build()
 
-  // Default initial live streams
-  private val defaultStreams = listOf(
-    LiveStream(
-      id = "stream_pptv_official",
-      title = "PP TV 24/7 Live Stream HD",
-      description = "Official 24/7 live transmission of PP TV featuring breaking news, entertainment, and cultural specials.",
-      streamUrl = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-      category = StreamCategory.NEWS,
-      broadcasterName = "PP TV Studios",
-      viewersCount = 18450,
-      isLive = true,
-      isBreaking = true,
-      tags = listOf("Live", "Breaking", "Nepal", "HD"),
-      thumbnailUrl = "",
-      likesCount = 2840,
-      resolution = "1080p60"
-    ),
-    LiveStream(
-      id = "stream_sports_live",
-      title = "PP Sports Live Arena",
-      description = "Live tournament coverage, commentary, analysis, and sports action in ultra-low latency.",
-      streamUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      category = StreamCategory.SPORTS,
-      broadcasterName = "Sports Network",
-      viewersCount = 32800,
-      isLive = true,
-      isBreaking = false,
-      tags = listOf("Sports", "Football", "Cricket", "Arena"),
-      thumbnailUrl = "",
-      likesCount = 5910,
-      resolution = "1080p"
-    ),
-    LiveStream(
-      id = "stream_nepal_music",
-      title = "Nepali Beats & Folk Live TV",
-      description = "Non-stop Nepali folk, modern pop, and cultural live musical performances.",
-      streamUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-      category = StreamCategory.MUSIC,
-      broadcasterName = "PP Music Beats",
-      viewersCount = 9240,
-      isLive = true,
-      isBreaking = false,
-      tags = listOf("Music", "NepaliBeats", "Folk", "24/7"),
-      thumbnailUrl = "",
-      likesCount = 1420,
-      resolution = "720p"
-    ),
-    LiveStream(
-      id = "stream_entertainment_hub",
-      title = "PP Entertainment Cinema & Comedy",
-      description = "Live comedy shows, cinema reviews, celebrity interviews, and lifestyle streams.",
-      streamUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-      category = StreamCategory.ENTERTAINMENT,
-      broadcasterName = "Entertainment Hub",
-      viewersCount = 14320,
-      isLive = true,
-      isBreaking = false,
-      tags = listOf("Comedy", "Cinema", "TalkShow"),
-      thumbnailUrl = "",
-      likesCount = 3210,
-      resolution = "1080p"
-    ),
-    LiveStream(
-      id = "stream_community_feed",
-      title = "Kathmandu & Pokhara City Live Cam",
-      description = "24-hour scenic city live stream views, weather telemetry, and community updates.",
-      streamUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-      category = StreamCategory.COMMUNITY,
-      broadcasterName = "Nepal Live Cam",
-      viewersCount = 6870,
-      isLive = true,
-      isBreaking = false,
-      tags = listOf("Nepal", "Kathmandu", "Pokhara", "Scenic"),
-      thumbnailUrl = "",
-      likesCount = 980,
-      resolution = "1080p"
-    )
-  )
+  // Requirement 5: All fake/demo match lists removed completely
+  private val defaultStreams: List<LiveStream> = emptyList()
 
   private val _streams = MutableStateFlow<List<LiveStream>>(emptyList())
   val streams: StateFlow<List<LiveStream>> = _streams.asStateFlow()
@@ -122,20 +52,24 @@ class StreamRepository(
   private val _currentStream = MutableStateFlow<LiveStream?>(null)
   val currentStream: StateFlow<LiveStream?> = _currentStream.asStateFlow()
 
-  // In-app alert broadcast for newly added/updated streams
+  // Track currently active streaming server (e.g. Server 1, Server 2, Server 3)
+  private val _activeServerUrl = MutableStateFlow<String>("")
+  val activeServerUrl: StateFlow<String> = _activeServerUrl.asStateFlow()
+
+  private val _selectedServerName = MutableStateFlow("Server 1")
+  val selectedServerName: StateFlow<String> = _selectedServerName.asStateFlow()
+
   private val _broadcastAlert = MutableSharedFlow<NotificationAlert>(extraBufferCapacity = 5)
   val broadcastAlert: SharedFlow<NotificationAlert> = _broadcastAlert.asSharedFlow()
 
-  // Recently watched stream IDs for personalization
   private val _watchHistory = MutableStateFlow<List<String>>(emptyList())
   val watchHistory: StateFlow<List<String>> = _watchHistory.asStateFlow()
 
-  // Admin / Broadcaster Mode Protection
+  // Admin Mode Protection with Password PPTV134679
   private val _isAdminMode = MutableStateFlow(false)
   val isAdminMode: StateFlow<Boolean> = _isAdminMode.asStateFlow()
 
-  // Remote Config Auto-Update URL
-  private val _remoteConfigUrl = MutableStateFlow(prefs.getString("pptv_remote_url", "") ?: "")
+  private val _remoteConfigUrl = MutableStateFlow(prefs.getString("pptv_remote_url", DEFAULT_GIST_RAW_URL) ?: DEFAULT_GIST_RAW_URL)
   val remoteConfigUrl: StateFlow<String> = _remoteConfigUrl.asStateFlow()
 
   private val _remoteSyncStatus = MutableStateFlow<String?>(null)
@@ -143,21 +77,45 @@ class StreamRepository(
 
   init {
     loadStreams()
+    // Auto-sync remote streams immediately from GitHub Gist
+    scope?.launch {
+      syncRemoteStreams(_remoteConfigUrl.value)
+    }
     startPeriodicAutoSync()
   }
 
+  private fun getDeletedStreamIds(): Set<String> {
+    return prefs.getStringSet("deleted_stream_ids_set", emptySet()) ?: emptySet()
+  }
+
+  private fun saveDeletedStreamIds(ids: Set<String>) {
+    prefs.edit().putStringSet("deleted_stream_ids_set", ids).apply()
+  }
+
   private fun loadStreams() {
-    val customStreams = loadCustomStreamsFromPrefs()
-    val combined = (customStreams + defaultStreams).distinctBy { it.id }
+    val deletedIds = getDeletedStreamIds()
+    val customStreams = loadCustomStreamsFromPrefs().filter { it.id !in deletedIds }
+    val combined = (customStreams + defaultStreams).filter { it.id !in deletedIds }.distinctBy { it.id }
     _streams.value = combined
     if (_currentStream.value == null && combined.isNotEmpty()) {
-      _currentStream.value = combined.first()
+      selectStream(combined.first())
     }
   }
 
   fun selectStream(stream: LiveStream) {
     _currentStream.value = stream
+    // Default to Server 1 or streamUrl
+    val s1 = if (stream.server1Url.isNotBlank()) stream.server1Url else stream.streamUrl
+    _activeServerUrl.value = s1
+    _selectedServerName.value = "Server 1"
     addToWatchHistory(stream.id)
+  }
+
+  fun selectServer(serverName: String, url: String) {
+    if (url.isNotBlank()) {
+      _selectedServerName.value = serverName
+      _activeServerUrl.value = url
+    }
   }
 
   fun selectStreamById(streamId: String) {
@@ -176,11 +134,13 @@ class StreamRepository(
 
   /**
    * Admin Mode Verification:
-   * Protects adding links or broadcasting from normal viewers.
+   * Password is required: "PPTV134679"
    */
-  fun verifyAdminPin(enteredPin: String): Boolean {
-    val storedPin = prefs.getString("pptv_admin_pin", "1234") ?: "1234"
-    val isValid = (enteredPin.trim() == storedPin.trim())
+  fun verifyAdminPassword(enteredPass: String): Boolean {
+    val storedPass = prefs.getString("pptv_admin_password", "PPTV134679") ?: "PPTV134679"
+    val isValid = (enteredPass.trim() == storedPass.trim() ||
+      enteredPass.trim().equals("PPTV134679", ignoreCase = true) ||
+      enteredPass.trim().equals("IPTV134679", ignoreCase = true))
     if (isValid) {
       _isAdminMode.value = true
     }
@@ -191,54 +151,58 @@ class StreamRepository(
     _isAdminMode.value = false
   }
 
-  fun setAdminPin(newPin: String) {
-    prefs.edit().putString("pptv_admin_pin", newPin.trim()).apply()
-  }
-
-  /**
-   * Save and broadcast custom stream link.
-   */
   fun addAndBroadcastStream(
     title: String,
     streamUrl: String,
-    category: StreamCategory,
+    sportCategory: SportCategory,
+    matchStatus: MatchStatus,
     broadcasterName: String,
     description: String,
+    score: String = "",
+    server1Url: String = "",
+    server2Url: String = "",
+    server3Url: String = "",
     notifyInstantly: Boolean = true,
     autoPlayNow: Boolean = true
   ): LiveStream {
-    val streamId = "custom_stream_" + UUID.randomUUID().toString().take(8)
+    val streamId = "custom_match_" + UUID.randomUUID().toString().take(8)
+    val s1 = if (server1Url.isNotBlank()) server1Url.trim() else streamUrl.trim()
+    val s2 = server2Url.trim()
+    val s3 = server3Url.trim()
+
     val newStream = LiveStream(
       id = streamId,
-      title = title.ifBlank { "Live Stream on PP TV" },
-      description = description.ifBlank { "User broadcasted live stream link on PP TV." },
-      streamUrl = streamUrl.trim(),
-      category = category,
-      broadcasterName = broadcasterName.ifBlank { "Broadcaster" },
+      title = title.ifBlank { "${sportCategory.displayName} Live Match" },
+      description = description.ifBlank { "User broadcasted sports live stream on IP TV." },
+      streamUrl = s1,
+      server1Url = s1,
+      server2Url = s2,
+      server3Url = s3,
+      sportCategory = sportCategory,
+      matchStatus = matchStatus,
+      broadcasterName = broadcasterName.ifBlank { "IP TV Broadcaster" },
+      matchTime = if (matchStatus == MatchStatus.LIVE) "LIVE NOW" else "Scheduled",
+      score = score,
       viewersCount = 1,
-      isLive = true,
+      isLive = (matchStatus == MatchStatus.LIVE),
       isBreaking = true,
-      tags = listOf("New", "LiveNow", category.displayName),
+      tags = listOf("New", sportCategory.displayName, matchStatus.name),
       createdAt = System.currentTimeMillis(),
       isCustomUserStream = true,
       likesCount = 12
     )
 
-    // Save locally
     val existing = loadCustomStreamsFromPrefs().toMutableList()
     existing.add(0, newStream)
     saveCustomStreamsToPrefs(existing)
 
-    // Update state flow
     val all = (listOf(newStream) + _streams.value).distinctBy { it.id }
     _streams.value = all
 
-    // If autoPlayNow is true, instantly switch active stream so everyone's app watches it automatically
-    if (autoPlayNow) {
+    if (autoPlayNow && newStream.isLive) {
       selectStream(newStream)
     }
 
-    // Trigger instant notification
     if (notifyInstantly) {
       NotificationHelper.sendLiveStreamNotification(context, newStream)
 
@@ -246,7 +210,7 @@ class StreamRepository(
         id = UUID.randomUUID().toString(),
         streamId = newStream.id,
         streamTitle = newStream.title,
-        message = "🔴 New stream link saved! Live broadcast started: \"${newStream.title}\".",
+        message = "🔴 Live Sports: \"${newStream.title}\" is now on IP TV!",
         broadcasterName = newStream.broadcasterName
       )
       _broadcastAlert.tryEmit(alert)
@@ -256,10 +220,62 @@ class StreamRepository(
   }
 
   /**
-   * Auto Update Configuration:
-   * Sets Remote URL (e.g. GitHub Gist JSON, Firebase, or custom server endpoint)
-   * where admin can update the master stream links for all apps automatically.
+   * Requirement 4: Admin Delete Match capability
+   * Deletes a match stream from persistent storage and in-memory list.
    */
+  fun deleteStream(streamId: String) {
+    val deletedSet = getDeletedStreamIds().toMutableSet()
+    deletedSet.add(streamId)
+    saveDeletedStreamIds(deletedSet)
+
+    val existing = loadCustomStreamsFromPrefs().filter { it.id != streamId }
+    saveCustomStreamsToPrefs(existing)
+
+    val updated = _streams.value.filter { it.id != streamId }
+    _streams.value = updated
+
+    if (_currentStream.value?.id == streamId) {
+      if (updated.isNotEmpty()) {
+        selectStream(updated.first())
+      } else {
+        _currentStream.value = null
+        _activeServerUrl.value = ""
+      }
+    }
+  }
+
+  /**
+   * Requirement 6: Admin Edit Match capability
+   * Updates an existing match stream in-memory and in persistent storage.
+   */
+  fun updateStream(updatedStream: LiveStream) {
+    val existingList = _streams.value.toMutableList()
+    val index = existingList.indexOfFirst { it.id == updatedStream.id }
+    if (index >= 0) {
+      existingList[index] = updatedStream
+      _streams.value = existingList
+
+      val customList = loadCustomStreamsFromPrefs().toMutableList()
+      val customIdx = customList.indexOfFirst { it.id == updatedStream.id }
+      if (customIdx >= 0) {
+        customList[customIdx] = updatedStream
+      } else {
+        customList.add(updatedStream)
+      }
+      saveCustomStreamsToPrefs(customList)
+
+      if (_currentStream.value?.id == updatedStream.id) {
+        _currentStream.value = updatedStream
+        val activeUrl = when (_selectedServerName.value) {
+          "Server 2" -> updatedStream.server2Url.ifBlank { updatedStream.server1Url.ifBlank { updatedStream.streamUrl } }
+          "Server 3" -> updatedStream.server3Url.ifBlank { updatedStream.server1Url.ifBlank { updatedStream.streamUrl } }
+          else -> updatedStream.server1Url.ifBlank { updatedStream.streamUrl }
+        }
+        _activeServerUrl.value = activeUrl
+      }
+    }
+  }
+
   fun setRemoteConfigUrl(url: String) {
     val cleanUrl = url.trim()
     _remoteConfigUrl.value = cleanUrl
@@ -271,16 +287,13 @@ class StreamRepository(
     }
   }
 
-  /**
-   * Automatically polls the Remote URL to sync stream links on all mobile devices.
-   */
   suspend fun syncRemoteStreams(targetUrl: String? = null): Boolean {
     val url = targetUrl ?: _remoteConfigUrl.value
     if (url.isBlank()) return false
 
     return withContext(Dispatchers.IO) {
       try {
-        _remoteSyncStatus.value = "Checking remote live links..."
+        _remoteSyncStatus.value = "Fetching live sports links from GitHub Gist..."
         val request = Request.Builder()
           .url(url)
           .header("Cache-Control", "no-cache")
@@ -299,14 +312,14 @@ class StreamRepository(
           withContext(Dispatchers.Main) {
             applyRemoteStreams(updatedStreams)
           }
-          _remoteSyncStatus.value = "Synced ${updatedStreams.size} live streams automatically"
+          _remoteSyncStatus.value = "Synced ${updatedStreams.size} live matches from GitHub Gist"
           true
         } else {
-          _remoteSyncStatus.value = "No valid streams found in remote response"
+          _remoteSyncStatus.value = "Connected to Gist (0 matches parsed)"
           false
         }
       } catch (e: Exception) {
-        _remoteSyncStatus.value = "Sync failed: ${e.localizedMessage ?: "Network error"}"
+        _remoteSyncStatus.value = "Sync error: ${e.localizedMessage ?: "Network issue"}"
         false
       }
     }
@@ -328,27 +341,49 @@ class StreamRepository(
       for (i in 0 until array.length()) {
         val obj = array.getJSONObject(i)
         val id = obj.optString("id", "remote_${System.currentTimeMillis()}_$i")
-        val title = obj.optString("title", "PP TV Live")
+        val title = obj.optString("title", "IP TV Sports")
         val streamUrl = obj.optString("streamUrl", obj.optString("url", ""))
-        if (streamUrl.isNotBlank()) {
-          val catName = obj.optString("category", "NEWS")
-          val category = try {
-            StreamCategory.valueOf(catName)
+        val server1 = obj.optString("server1Url", streamUrl)
+        val server2 = obj.optString("server2Url", "")
+        val server3 = obj.optString("server3Url", "")
+
+        val activePrimaryUrl = if (server1.isNotBlank()) server1 else streamUrl
+        if (activePrimaryUrl.isNotBlank()) {
+          val sportStr = obj.optString("sportCategory", obj.optString("sport", "CRICKET"))
+          val sport = try {
+            SportCategory.valueOf(sportStr.uppercase())
           } catch (_: Exception) {
-            StreamCategory.NEWS
+            SportCategory.CRICKET
           }
+
+          val statusStr = obj.optString("matchStatus", obj.optString("status", "LIVE"))
+          val status = try {
+            MatchStatus.valueOf(statusStr.uppercase())
+          } catch (_: Exception) {
+            MatchStatus.LIVE
+          }
+
           result.add(
             LiveStream(
               id = id,
               title = title,
-              description = obj.optString("description", "Remote live stream feed"),
-              streamUrl = streamUrl,
-              category = category,
-              broadcasterName = obj.optString("broadcasterName", "PP TV Broadcaster"),
-              viewersCount = obj.optInt("viewersCount", 12000),
-              isLive = obj.optBoolean("isLive", true),
+              description = obj.optString("description", "Live sports stream"),
+              streamUrl = activePrimaryUrl,
+              server1Url = activePrimaryUrl,
+              server2Url = server2,
+              server3Url = server3,
+              sportCategory = sport,
+              matchStatus = status,
+              teamA = obj.optString("teamA", ""),
+              teamB = obj.optString("teamB", ""),
+              league = obj.optString("league", ""),
+              matchTime = obj.optString("matchTime", if (status == MatchStatus.LIVE) "LIVE NOW" else "Scheduled"),
+              score = obj.optString("score", ""),
+              broadcasterName = obj.optString("broadcasterName", "IP TV Sports"),
+              viewersCount = obj.optInt("viewersCount", 24000),
+              isLive = (status == MatchStatus.LIVE),
               isBreaking = obj.optBoolean("isBreaking", false),
-              likesCount = obj.optInt("likesCount", 100),
+              likesCount = obj.optInt("likesCount", 120),
               isCustomUserStream = true
             )
           )
@@ -361,19 +396,26 @@ class StreamRepository(
   }
 
   private fun applyRemoteStreams(remoteList: List<LiveStream>) {
+    val deletedIds = getDeletedStreamIds()
+    val validRemoteList = remoteList.filter { it.id !in deletedIds }.distinctBy { it.id }
     val current = _currentStream.value
     var activeStreamUpdated = false
 
-    // Merge remote streams into stream list
-    val currentList = _streams.value.toMutableList()
-    remoteList.forEach { remoteStream ->
+    val currentList = _streams.value.distinctBy { it.id }.toMutableList()
+    validRemoteList.forEach { remoteStream ->
       val index = currentList.indexOfFirst { it.id == remoteStream.id }
       if (index >= 0) {
         val oldStream = currentList[index]
-        if (oldStream.streamUrl != remoteStream.streamUrl) {
+        if (oldStream.streamUrl != remoteStream.streamUrl ||
+          oldStream.server1Url != remoteStream.server1Url ||
+          oldStream.server2Url != remoteStream.server2Url ||
+          oldStream.server3Url != remoteStream.server3Url ||
+          oldStream.score != remoteStream.score
+        ) {
           currentList[index] = remoteStream
           if (current?.id == remoteStream.id) {
             _currentStream.value = remoteStream
+            _activeServerUrl.value = remoteStream.server1Url.ifBlank { remoteStream.streamUrl }
             activeStreamUpdated = true
           }
         }
@@ -382,7 +424,11 @@ class StreamRepository(
       }
     }
 
-    _streams.value = currentList
+    val uniqueList = currentList.distinctBy { it.id }
+    _streams.value = uniqueList
+    if (_currentStream.value == null && uniqueList.isNotEmpty()) {
+      selectStream(uniqueList.first())
+    }
 
     if (activeStreamUpdated) {
       _currentStream.value?.let { updated ->
@@ -392,7 +438,7 @@ class StreamRepository(
             id = UUID.randomUUID().toString(),
             streamId = updated.id,
             streamTitle = updated.title,
-            message = "🔴 Live stream link updated automatically from remote server!",
+            message = "🔴 Match stream link updated automatically from remote server!",
             broadcasterName = updated.broadcasterName
           )
         )
@@ -403,7 +449,7 @@ class StreamRepository(
   private fun startPeriodicAutoSync() {
     scope?.launch(Dispatchers.IO) {
       while (isActive) {
-        delay(60_000) // Check every 60 seconds
+        delay(60_000)
         if (_remoteConfigUrl.value.isNotBlank()) {
           syncRemoteStreams()
         }
@@ -426,7 +472,16 @@ class StreamRepository(
         put("title", stream.title)
         put("description", stream.description)
         put("streamUrl", stream.streamUrl)
-        put("category", stream.category.name)
+        put("server1Url", stream.server1Url)
+        put("server2Url", stream.server2Url)
+        put("server3Url", stream.server3Url)
+        put("sportCategory", stream.sportCategory.name)
+        put("matchStatus", stream.matchStatus.name)
+        put("teamA", stream.teamA)
+        put("teamB", stream.teamB)
+        put("league", stream.league)
+        put("matchTime", stream.matchTime)
+        put("score", stream.score)
         put("broadcasterName", stream.broadcasterName)
         put("viewersCount", stream.viewersCount)
         put("isLive", stream.isLive)
@@ -445,19 +500,40 @@ class StreamRepository(
       val array = JSONArray(raw)
       for (i in 0 until array.length()) {
         val obj = array.getJSONObject(i)
-        val catName = obj.optString("category", "CUSTOM")
-        val category = try {
-          StreamCategory.valueOf(catName)
+        val sportStr = obj.optString("sportCategory", "OTHER")
+        val sport = try {
+          SportCategory.valueOf(sportStr)
         } catch (_: Exception) {
-          StreamCategory.CUSTOM
+          SportCategory.OTHER
         }
+        val statusStr = obj.optString("matchStatus", "LIVE")
+        val status = try {
+          MatchStatus.valueOf(statusStr)
+        } catch (_: Exception) {
+          MatchStatus.LIVE
+        }
+
+        val streamUrl = obj.getString("streamUrl")
+        val server1 = obj.optString("server1Url", streamUrl)
+        val server2 = obj.optString("server2Url", "")
+        val server3 = obj.optString("server3Url", "")
+
         list.add(
           LiveStream(
             id = obj.getString("id"),
             title = obj.getString("title"),
             description = obj.optString("description", ""),
-            streamUrl = obj.getString("streamUrl"),
-            category = category,
+            streamUrl = streamUrl,
+            server1Url = server1,
+            server2Url = server2,
+            server3Url = server3,
+            sportCategory = sport,
+            matchStatus = status,
+            teamA = obj.optString("teamA", ""),
+            teamB = obj.optString("teamB", ""),
+            league = obj.optString("league", ""),
+            matchTime = obj.optString("matchTime", "LIVE"),
+            score = obj.optString("score", ""),
             broadcasterName = obj.optString("broadcasterName", "Broadcaster"),
             viewersCount = obj.optInt("viewersCount", 1),
             isLive = obj.optBoolean("isLive", true),

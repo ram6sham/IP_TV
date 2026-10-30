@@ -1,6 +1,7 @@
 {
-  "name": "PP TV",
-  "description": "PP TV live streaming app with real-time stream sync, interactive chat, instant broadcast notifications, and personalized recommendations",
+  "name": "IP TV",
+  "description": "IP TV live streaming app with real-time stream sync, multi-server sports broadcast, instant notifications, and personalized recommendations",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+
